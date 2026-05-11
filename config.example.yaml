@@ -1,0 +1,14 @@
+interval_seconds: 300
+output_dir: ./downloads
+jobs:
+  - name: bilibili-live
+    type: live
+    url: https://live.bilibili.com/0000
+    backend: streamlink
+    enabled: true
+
+  - name: youtube-channel
+    type: vod
+    url: https://www.youtube.com/@example/videos
+    backend: yt-dlp
+    enabled: true
