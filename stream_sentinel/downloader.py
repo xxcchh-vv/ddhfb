@@ -4,7 +4,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from adapters.bilibili import BilibiliLiveAdapter
 from hls_recorder import HLSRecorder
+from platforms import Platform, detect_platform
 from transcoder import Transcoder
 
 
@@ -54,6 +56,56 @@ def download_with_ytdlp(job: dict, output_dir: Path) -> None:
     run_command(args)
 
 
+def record_with_ffmpeg(url: str, output: Path) -> int:
+    require_binary('ffmpeg')
+
+    args = [
+        'ffmpeg',
+        '-y',
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
+        '-i', url,
+        '-c', 'copy',
+        str(output),
+    ]
+
+    return subprocess.run(args).returncode
+
+
+def record_with_bilibili(job: dict, output_dir: Path) -> None:
+    job_dir = output_dir / safe_name(job['name'])
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    play_url = BilibiliLiveAdapter.get_best_play_url(job['url'])
+
+    if not play_url:
+        raise DownloadError('No Bilibili play URL found')
+
+    if job.get('use_hls_recorder', True):
+        HLSRecorder.record(play_url, str(job_dir), safe_name(job['name']))
+        return
+
+    retries = 0
+
+    while retries < MAX_RETRIES:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output = job_dir / f'{timestamp}_{safe_name(job["name"])}.ts'
+        code = record_with_ffmpeg(play_url, output)
+
+        if code == 0:
+            if job.get('auto_transcode', True):
+                try:
+                    Transcoder.transcode_to_mp4(str(output))
+                except Exception:
+                    pass
+            return
+
+        retries += 1
+        time.sleep(RETRY_DELAY)
+
+    raise DownloadError(f'Bilibili recording failed after retries: {job["name"]}')
+
 
 def record_with_streamlink(job: dict, output_dir: Path) -> None:
     require_binary('streamlink')
@@ -96,7 +148,11 @@ def run_job(job: dict, output_dir: str) -> None:
     base_dir = Path(output_dir)
     base_dir.mkdir(parents=True, exist_ok=True)
 
-    if backend == 'yt-dlp':
+    platform = detect_platform(job.get('url', ''))
+
+    if job.get('type') == 'live' and platform == Platform.BILIBILI:
+        record_with_bilibili(job, base_dir)
+    elif backend == 'yt-dlp':
         download_with_ytdlp(job, base_dir)
     elif backend == 'streamlink':
         record_with_streamlink(job, base_dir)
