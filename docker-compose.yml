@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  stream-sentinel:
+    image: python:3.11
+    container_name: stream-sentinel
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: bash -c "pip install -r requirements.txt && python stream_sentinel/main.py"
+    restart: unless-stopped
