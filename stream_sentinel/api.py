@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 
 from config import load_config, save_config
 from job_controller import job_controller
+from metrics import metrics_registry
 from runtime import runtime_registry
 
 app = Flask(__name__)
@@ -12,6 +13,11 @@ app = Flask(__name__)
 @app.route('/api/jobs')
 def jobs():
     return jsonify(runtime_registry.list_jobs())
+
+
+@app.route('/api/metrics')
+def metrics():
+    return jsonify(metrics_registry.list())
 
 
 @app.route('/api/logs')
