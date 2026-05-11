@@ -1,6 +1,9 @@
 import json
 import subprocess
 
+from adapters.bilibili import BilibiliLiveAdapter
+from platforms import Platform, detect_platform
+
 
 class LiveCheckError(RuntimeError):
     pass
@@ -9,6 +12,15 @@ class LiveCheckError(RuntimeError):
 class LiveChecker:
     @staticmethod
     def is_live(url: str) -> bool:
+        platform = detect_platform(url)
+
+        if platform == Platform.BILIBILI:
+            try:
+                room = BilibiliLiveAdapter.get_room_info(url)
+                return bool(room.get('is_live'))
+            except Exception:
+                pass
+
         command = [
             'yt-dlp',
             '--dump-json',
