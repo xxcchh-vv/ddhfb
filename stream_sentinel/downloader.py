@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from hls_recorder import HLSRecorder
 from transcoder import Transcoder
 
 
@@ -53,11 +54,16 @@ def download_with_ytdlp(job: dict, output_dir: Path) -> None:
     run_command(args)
 
 
+
 def record_with_streamlink(job: dict, output_dir: Path) -> None:
     require_binary('streamlink')
 
     job_dir = output_dir / safe_name(job['name'])
     job_dir.mkdir(parents=True, exist_ok=True)
+
+    if job.get('use_hls_recorder', False):
+        HLSRecorder.record(job['url'], str(job_dir), safe_name(job['name']))
+        return
 
     quality = job.get('quality', 'best')
     retries = 0
@@ -82,6 +88,7 @@ def record_with_streamlink(job: dict, output_dir: Path) -> None:
         time.sleep(RETRY_DELAY)
 
     raise DownloadError(f'Max retries exceeded for {job["name"]}')
+
 
 
 def run_job(job: dict, output_dir: str) -> None:
