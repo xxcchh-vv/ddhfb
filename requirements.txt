@@ -1,0 +1,7 @@
+yt-dlp
+streamlink
+pyyaml
+sqlalchemy
+schedule
+rich
+click
