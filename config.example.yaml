@@ -1,11 +1,17 @@
 interval_seconds: 300
+workers: 3
 output_dir: ./downloads
+database_path: ./data/stream_sentinel.db
+
 jobs:
   - name: bilibili-live
     type: live
     url: https://live.bilibili.com/0000
     backend: streamlink
     enabled: true
+    quality: best
+    check_live: true
+    auto_transcode: true
 
   - name: youtube-channel
     type: vod
