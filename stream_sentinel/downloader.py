@@ -1,11 +1,18 @@
 import shutil
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
+
+from transcoder import Transcoder
 
 
 class DownloadError(RuntimeError):
     pass
+
+
+MAX_RETRIES = 5
+RETRY_DELAY = 30
 
 
 def require_binary(name: str) -> None:
@@ -18,7 +25,6 @@ def safe_name(name: str) -> str:
 
 
 def run_command(args: list[str]) -> None:
-    print(' '.join(args))
     process = subprocess.run(args)
     if process.returncode != 0:
         raise DownloadError(f'Command failed with exit code {process.returncode}')
@@ -30,6 +36,7 @@ def download_with_ytdlp(job: dict, output_dir: Path) -> None:
 
     job_dir = output_dir / safe_name(job['name'])
     job_dir.mkdir(parents=True, exist_ok=True)
+
     archive = job_dir / 'archive.txt'
     template = str(job_dir / '%(upload_date)s_%(title).120s_%(id)s.%(ext)s')
 
@@ -43,10 +50,6 @@ def download_with_ytdlp(job: dict, output_dir: Path) -> None:
         '--ignore-errors',
     ]
 
-    extra_args = job.get('extra_args', [])
-    if extra_args:
-        args.extend(extra_args)
-
     run_command(args)
 
 
@@ -55,12 +58,30 @@ def record_with_streamlink(job: dict, output_dir: Path) -> None:
 
     job_dir = output_dir / safe_name(job['name'])
     job_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output = job_dir / f'{timestamp}_{safe_name(job["name"])}.ts'
 
     quality = job.get('quality', 'best')
-    args = ['streamlink', job['url'], quality, '-o', str(output)]
-    run_command(args)
+    retries = 0
+
+    while retries < MAX_RETRIES:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output = job_dir / f'{timestamp}_{safe_name(job["name"])}.ts'
+
+        args = ['streamlink', job['url'], quality, '-o', str(output)]
+
+        process = subprocess.run(args)
+
+        if process.returncode == 0:
+            if job.get('auto_transcode', True):
+                try:
+                    Transcoder.transcode_to_mp4(str(output))
+                except Exception:
+                    pass
+            return
+
+        retries += 1
+        time.sleep(RETRY_DELAY)
+
+    raise DownloadError(f'Max retries exceeded for {job["name"]}')
 
 
 def run_job(job: dict, output_dir: str) -> None:
