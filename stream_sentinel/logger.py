@@ -1,5 +1,7 @@
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+from ws_log_stub import runtime_logs
 
 
 class Logger:
@@ -11,5 +13,9 @@ class Logger:
         file_path = self.log_dir / f'{job_name}.log'
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+        line = f'[{timestamp}] [{job_name}] {message}'
+
+        runtime_logs.push(line)
+
         with open(file_path, 'a', encoding='utf-8') as f:
-            f.write(f'[{timestamp}] {message}\n')
+            f.write(line + '\n')
