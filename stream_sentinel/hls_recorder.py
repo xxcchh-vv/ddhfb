@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from metrics import metrics_registry
 
 MAX_RECONNECTS = 10
 RECONNECT_DELAY = 15
@@ -27,6 +28,9 @@ class HLSRecorder:
             command = [
                 'ffmpeg',
                 '-y',
+                '-reconnect', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_delay_max', '5',
                 '-i',
                 url,
                 '-c',
@@ -45,9 +49,17 @@ class HLSRecorder:
             process = subprocess.run(command)
 
             if process.returncode == 0:
+                metrics_registry.increment(stream_name, 'segments')
                 return
 
             reconnects += 1
+
+            metrics_registry.increment(stream_name, 'reconnects')
+            metrics_registry.update(
+                stream_name,
+                last_error=f'ffmpeg exited with code {process.returncode}',
+            )
+
             time.sleep(RECONNECT_DELAY)
 
         raise RuntimeError('HLS recorder exceeded reconnect limit')
