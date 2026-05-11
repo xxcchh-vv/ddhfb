@@ -9,6 +9,8 @@ class JobMetrics:
     reconnects: int = 0
     segments: int = 0
     last_error: str = ''
+    bitrate: str = ''
+    speed: str = ''
     updated_at: str = ''
 
 
